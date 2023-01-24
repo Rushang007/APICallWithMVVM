@@ -1,0 +1,4 @@
+//
+//  ImageRequestModel.swift
+
+import Foundation
