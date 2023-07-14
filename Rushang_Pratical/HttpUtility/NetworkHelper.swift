@@ -4,10 +4,18 @@
 
 import Foundation
 
+enum DataError: Error {
+    case invalidResponse
+    case invalidURL
+    case invalidData
+    case network(Error?)
+}
 
 final class APIHandler {
     static let shared = APIHandler()
     private init(){}
+    
+    
     
     func getApiData<T:Decodable>(requestUrlStr:String,method:HttpMethods,resultType: T.Type,completionHandler:@escaping(Result<T?, NetworkError>) -> Void)
     {
@@ -76,4 +84,71 @@ final class APIHandler {
         }
         return nil
     }
+}
+
+
+extension APIHandler {
+    
+    func request<T:Decodable>(url:String) async throws -> T {
+        guard let url = URL(string: url) else {
+            throw DataError.invalidURL
+        }
+        
+        let (data,response) = try await URLSession.shared.data(from:url)
+        
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw DataError.invalidResponse
+        }
+        
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+    //How to Use request
+    // @MainActor -> DispatchQueue.Main.async
+//    @MainActor func fetchUsers() {
+//        Task { // @MainActor in
+//            do {
+//                let userResponseArray: [UserModel] = try await manager.request(url: userURL)
+//                    self.users = userResponseArray
+//            }catch {
+//                print(error)
+//            }
+//        }
+//
+//    }
+    //------------------------- //------------------------- //-------------------------
+    func postRequest<T: Encodable, R: Decodable>(url: String, body: T) async throws -> R {
+        guard let url = URL(string: url) else {
+            throw DataError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let encoder = JSONEncoder()
+        let requestData = try encoder.encode(body)
+        request.httpBody = requestData
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw DataError.invalidResponse
+        }
+        
+        let decoder = JSONDecoder()
+        let decodedResponse = try decoder.decode(R.self, from: data)
+        
+        return decodedResponse
+    }
+    
+    //How to Use postRequest
+   
+//    do {
+//        let newUser = User(id: 1, name: "John Doe")
+//        let createdUser: User = try await postRequest(url: "https://example.com/api/users", body: newUser)
+//        print("User created:", createdUser)
+//    } catch {
+//        print("Error:", error)
+//    }
+
 }
